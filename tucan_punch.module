@@ -61,7 +61,7 @@ function tucan_punch_block_view($delta = ''){
       $block['content'] = array(
             '#theme' => 'button__tucan_punch__block',
             '#value' => 'Entrar',
-            '#type' => 'submit',
+            '#type' => 'button',
             );
       break;
   }
