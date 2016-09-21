@@ -119,6 +119,7 @@ function admin_punch_form_alter(&$form, &$form_state, $form_id){
 //funcion para qe guarde los datos una vez que se presione el boton
 function admin_punch_first_form_submit($form, &$form_state){
   $prase = $form_state['values']['button_submit'];
+
 global $user;
 $user_full = user_load($user->uid, true);
 $only_id = $user_full->uid;
@@ -129,7 +130,7 @@ $addre = ip_address();*/
 ->fields(array(
   'uid' => $only_id,
   'entry_time' => REQUEST_TIME,
-  'ip_address' => $ip_address(),
+  'ip_address' => ip_address(),
   ))
 ->execute();
 
