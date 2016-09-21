@@ -129,7 +129,7 @@ $addre = ip_address();*/
 ->fields(array(
   'uid' => $only_id,
   'entry_time' => REQUEST_TIME,
-  'ip_address' => $ip_address(),
+  'ip_address' => ip_address(),
   ))
 ->execute();
 
@@ -173,7 +173,7 @@ function admin_punch_menu() {
     'access callback' => TRUE,
     'access arguments' => array('access administration pages'),
     'type' => MENU_NORMAL_ITEM,
-      'weight'  => 0,    
+      'weight'  => 0,
   );
 
   return $items;
@@ -182,8 +182,8 @@ function admin_punch_menu() {
 
 
 function _admin_punch_Adminpage($message) {
-  
-  
-    
+
+
+
     return $message;
   }
