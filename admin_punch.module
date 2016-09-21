@@ -1,13 +1,15 @@
 <?php
 
+//link de ayuda del modulo
 function admin_punch_help($path, $arg) {
-    switch ($path) {
-        case "admin/help#admin_punch":
-            return '' . t("Module built to help employees to set when they came in and go out from work") . '';
-            break;
-    }
+  switch ($path) {
+    case "admin/help#admin_punch":
+      return '' . t("Module built to help employees to set when they came in and go out from work") . '';
+    break;
+  }
 }
 
+//declaracion del bloque
 function admin_punch_block_info(){
   $blocks['admin_punch'] = array(
     'info' => t('Admin Punch'),
@@ -16,36 +18,30 @@ function admin_punch_block_info(){
   return $blocks;
 }
 
-
-
-
-
-
-
-
-
-
-
-//funcion para el menu de configuracion
-function admin_punch_menu() {
-  $items = array();
-
-  $items['admin/config/content/admin_punch'] = array(
-    'title' => 'Menu configuration',
-    'description' => 'Configuration for admin_punch module',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('admin_punch_form'),
-    'access arguments' => array('access administration pages'),
-    'type' => MENU_NORMAL_ITEM,
-  );
-
-  return $items;
+//vista del bloque
+function admin_punch_block_view($delta = ''){
+  switch ($delta) {
+    case 'admin_punch':
+      $block['subject'] = t('Admin Punch!!');
+      if (user_access('access admin_punch content')) {
+      $block['content'] = drupal_get_form('admin_punch_first_form');
+      }
+    break;
+  }
+  return $block;
 }
 
-
-
+//permiso para los usuarios que tengan permiso, visualicen el bloque
+function admin_punch_permission(){
+  return array(
+    'access admin_punch content' => array(
+      'title' => t('Access to admin_punch module'),
+    )
+  );
+}
 
 //formulario para la configuracion
+//solo esta el form, faltaria el link en el menu de configuracinones
 function admin_punch_form($form, &$form_state){
   $form['administration_form'] = array(
     '#type' => 'textfield',
@@ -54,88 +50,114 @@ function admin_punch_form($form, &$form_state){
   return system_settings_form($form);
 }
 
-
-
+//formulario dentro del bloque
 function admin_punch_first_form($form, &$form_state){
 
-global $user;
+//este codigo comentado es nada mas para visualizar que la info se esta
+//cargando correctamente
+
+
+
+/*global $user;
 $ka = user_load($user->uid, true);
 $ka2 = $ka->uid;
+$time = date('h:i:s A');
+$addre = ip_address();
 
-  $form['name_of_user'] = array(
-    '#title' => t('enter your name'),
+  $form['punch_ip_address'] = array(
+    '#title' => t('user ip'),
+    '#type' => 'textfield',
+    '#value' => ip_address(),
+    );
+  $form['punch_user_id'] = array(
+    '#title' => t('user id'),
     '#type' => 'textfield',
     '#value' => $ka2,
     //'#type' => 'hidden',
     );
-  $form['button_s'] = array(
+
+  $form['punch_time'] = array(
+    '#title' => t('Actual time'),
+    '#type' => 'textfield',
+    '#value' => REQUEST_TIME,
+    //'#type' => 'hidden',
+    );*/
+
+  $form['button_submit'] = array(
     '#type' => 'submit',
     '#value' => 'Punch in',
     );
   return $form;
 }
 
+//hook alter para cambiar el nombre del boton, dependiendo de su esta entrando o
+//saliendo (entry_time o exit_time)
+//
+//AUN NO ES COMPLETAMENTE FUNCIONAL!!!!!!!!!!!!!!!!!!!!!!!
+//
+function admin_punch_form_alter(&$form, &$form_state, $form_id){
+  /*if ($form_id == 'admin_punch_first_form') {
+    if ($form['button_submit']['#value'] == 'Punch in') {
+      $form['button_submit']['#value'] = t('PUNCH in');
+    } else {
+      $form['button_submit']['#value'] = t('PUNCH out');
+    }
 
+  print'<pre>';
+  print_r($form);
+  print'</pre>';*/
 
+  /*if ($form_id == 'admin_punch_first_form') {
+    if ($form['button_submit']['#value'] == 'Punch in') {
+      $form['punch_time']['#value'] = t('PUNCH in');
+    }
+  }*/
 
-/*
-es necesario crear una funcion para guardar la info del empleado (la locacion, la ip, el horario, un ID, por ahora estos campos...podrian ser mas)
-
-
-por otra parte, una vez creado el block, debe tener un boton para el debido registro
-
-al presionar el boton, se guardaran los datos mencionados anteriormente Y cambiar de titulo: antes d entrar dira PUNCH IN, y para salir dira PUNCH OUT
-
-
- */
-
-
-
-//Vista del boque
-function admin_punch_block_view($delta = ''){
-  switch ($delta) {
-    case 'admin_punch':
-      $block['subject'] = t('Admin Punch!!');
-      /*$block['content'] = array(
-            '#theme' => 'button__admin_punch__block',
-            '#value' => 'Entrar',
-            '#type' => 'submit',
-            );*/
-      $block['content'] = drupal_get_form('admin_punch_first_form');
-      break;
-  }
-  return $block;
-}
-/*
-function admin_punch_block_view($delta = ''){
-  switch ($delta) {
-    case 'admin_punch':
-      $block['subject'] = t('admin Punch Baby');
-      $block['content'] = admin_punch_my_form($f, $r);/*array(
-            '#theme' => 'button__admin_punch__block',
-            '#value' => 'Entrar',
-            '#type' => 'submit',
-            );
-      $block['content'] = theme('button', array('value' => 'Punchinator'));
-
-      $form = array();
-      $block['content'] = $form['name_form_ema'] = array('#type' => 'submit', '#value' => 'submit');
-      break;
-  }
-  return $block;
 }
 
 
-function admin_punch_my_form($form, &$form_state) {
+//funcion para qe guarde los datos una vez que se presione el boton
+function admin_punch_first_form_submit($form, &$form_state){
+  $prase = $form_state['values']['button_submit'];
+global $user;
+$user_full = user_load($user->uid, true);
+$only_id = $user_full->uid;
+/*$time = date('h:i:s A');
+$addre = ip_address();*/
 
-  $form['submit'] = array(
-    '#type' => 'submit',
-    '#value' => 'ENTRAR',
-  );
-  return $form;
-}
+  $punch_query = db_insert('admin_punch_time')
+->fields(array(
+  'uid' => $only_id,
+  'entry_time' => REQUEST_TIME,
+  'ip_address' => $ip_address(),
+  ))
+->execute();
 
-
-function admin_punch_form_submit($form, &$form_state){
   drupal_set_message(t('Submitted'));
+}
+
+
+
+/*function admin_punch_form_submit($form, &$form_state){
+  $nid = db_insert('tucan_punch_time')
+->fields(array(
+  'ip_address' => $addre,
+  ))
+->execute();
+  drupal_set_message(t('Submitted'));
+}*/
+
+//funcion para el menu de configuracion
+/*function admin_punch_menu() {
+  $items = array();
+
+  $items['admin_punch'] = array(
+    'title' => 'Menu configuration',
+    'description' => 'Configuration for admin_punch module',
+    'page callback' => '_admin_punch_page',
+    'access arguments' => array('access admin_punch content'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
 }*/
