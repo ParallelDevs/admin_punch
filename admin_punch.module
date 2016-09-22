@@ -85,7 +85,7 @@ $addre = ip_address();
 
   $form['button_submit'] = array(
     '#type' => 'submit',
-    '#value' => 'Punch in',
+    '#value' => variable_get('btn_punch', 'Punch In'),
     );
   return $form;
 }
@@ -93,25 +93,10 @@ $addre = ip_address();
 //hook alter para cambiar el nombre del boton, dependiendo de su esta entrando o
 //saliendo (entry_time o exit_time)
 //
-//AUN NO ES COMPLETAMENTE FUNCIONAL!!!!!!!!!!!!!!!!!!!!!!!
+//
 //
 function admin_punch_form_alter(&$form, &$form_state, $form_id){
-  /*if ($form_id == 'admin_punch_first_form') {
-    if ($form['button_submit']['#value'] == 'Punch in') {
-      $form['button_submit']['#value'] = t('PUNCH in');
-    } else {
-      $form['button_submit']['#value'] = t('PUNCH out');
-    }
 
-  print'<pre>';
-  print_r($form);
-  print'</pre>';*/
-
-  /*if ($form_id == 'admin_punch_first_form') {
-    if ($form['button_submit']['#value'] == 'Punch in') {
-      $form['punch_time']['#value'] = t('PUNCH in');
-    }
-  }*/
 
 }
 
@@ -134,34 +119,14 @@ variable_set('ipip', ip_address());
   ))
 ->execute();
 
+if (variable_get('btn_punch') == 'Punch In') {
+      variable_set('btn_punch', 'Punch Out');
+    }else{
+      variable_set('btn_punch', 'Punch In');
+    }
+
   drupal_set_message(t('Submitted'));
 }
-
-
-
-/*function admin_punch_form_submit($form, &$form_state){
-  $nid = db_insert('tucan_punch_time')
-->fields(array(
-  'ip_address' => $addre,
-  ))
-->execute();
-  drupal_set_message(t('Submitted'));
-}*/
-
-//funcion para el menu de configuracion
-/*function admin_punch_menu() {
-  $items = array();
-
-  $items['admin_punch'] = array(
-    'title' => 'Menu configuration',
-    'description' => 'Configuration for admin_punch module',
-    'page callback' => '_admin_punch_page',
-    'access arguments' => array('access admin_punch content'),
-    'type' => MENU_NORMAL_ITEM,
-  );
-
-  return $items;
-}*/
 
 function admin_punch_menu() {
   $items = array();
