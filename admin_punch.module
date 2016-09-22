@@ -124,12 +124,13 @@ $user_full = user_load($user->uid, true);
 $only_id = $user_full->uid;
 /*$time = date('h:i:s A');
 $addre = ip_address();*/
+variable_set('ipip', ip_address());
 
-  $punch_query = db_insert('admin_punch_time')
+  $punch_query = db_insert('user_punch_time')
 ->fields(array(
   'uid' => $only_id,
   'entry_time' => REQUEST_TIME,
-  'ip_address' => $ip_address(),
+  'ip_address' => str_replace(".","",variable_get('ipip')),
   ))
 ->execute();
 
@@ -165,7 +166,7 @@ $addre = ip_address();*/
 function admin_punch_menu() {
   $items = array();
 
-  $items['admin/company/admin_punch'] = array(
+  $items['admin/company/punchinout'] = array(
     'title' => 'Admin Page',
     'description' => 'Administration for admin_punch module',
     'page callback' => '_admin_punch_Adminpage',
