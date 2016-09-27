@@ -37,8 +37,9 @@ function admin_punch_schema() {
             'unsigned' => TRUE,
             'not null' => TRUE),
       'ip_address' => array(
-            'description' => 'User ip address.', 
-            'type' => 'int',
+            'description' => 'Ip address blocked.', 
+            'type' => 'varchar',
+            'length' => 12,
             'null' => TRUE),  
       'uid' => array(
             'description' => 'User Id',
@@ -52,7 +53,7 @@ function admin_punch_schema() {
             'description' => 'a field to hold the IP description', 
             'type' => 'varchar',
             'length' => 100,
-            'not null' => TRUE),
+            'null' => TRUE),
             ),
         'primary key' => array('pid'),
     );
@@ -92,6 +93,8 @@ function admin_punch_schema() {
              ), 
         'primary key' => array('pid'),     
     );
+    
+    
     
     return $schema;
 }

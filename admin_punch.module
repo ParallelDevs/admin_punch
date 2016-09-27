@@ -19,17 +19,37 @@ function admin_punch_block_info(){
 }
 
 //vista del bloque
-function admin_punch_block_view($delta = ''){
+/*function admin_punch_block_view($delta = ''){
   switch ($delta) {
     case 'admin_punch':
       $block['subject'] = t('Admin Punch!!');
-      if (user_access('access admin_punch content')) {
+   //   if (user_access('access admin_punch content')) {
+         if (user_access('access admin_punch content') && admin_punch_validate()==NULL ) {
       $block['content'] = drupal_get_form('admin_punch_first_form');
       }
     break;
   }
   return $block;
+}*/
+
+function admin_punch_block_view($delta = ''){
+  switch ($delta) {
+    case 'admin_punch':
+      $block['subject'] = t('Admin Punch!!');
+   //   if (user_access('access admin_punch content')) {
+         if (user_access('access admin_punch content')) {
+             if(admin_punch_validate()==NULL){
+                 $block['content'] = drupal_get_form('admin_punch_first_form');
+             }else{
+                drupal_set_message(t('you can not see the module admin punch because your ip address are blocked'));     
+            }
+      
+      }
+    break;
+  }
+  return $block;
 }
+
 
 //permiso para los usuarios que tengan permiso, visualicen el bloque
 function admin_punch_permission(){
@@ -103,7 +123,7 @@ function admin_punch_form_alter(&$form, &$form_state, $form_id){
 
 //funcion para qe guarde los datos una vez que se presione el boton
 function admin_punch_first_form_submit($form, &$form_state){
-  $prase = $form_state['values']['button_submit'];
+ 
 global $user;
 $user_full = user_load($user->uid, true);
 $only_id = $user_full->uid;
@@ -128,28 +148,91 @@ if (variable_get('btn_punch') == 'Punch In') {
   drupal_set_message(t('Submitted'));
 }
 
+
+
 function admin_punch_menu() {
   $items = array();
 
   $items['admin/company/punchinout'] = array(
     'title' => 'Admin Page',
     'description' => 'Administration for admin_punch module',
-    'page callback' => '_admin_punch_Adminpage',
-    'page arguments' => array(2),
+    'page callback' => 'admin_punch_Adminpage',
     'access callback' => TRUE,
     'access arguments' => array('access administration pages'),
     'type' => MENU_NORMAL_ITEM,
-      'weight'  => 0,
+    'weight'  => 0,
   );
-
   return $items;
 }
 
+//Pagina donde se va a tener el formulario para ingresar las ip que se quiere bloquear
+function admin_punch_Adminpage() {
 
-
-function _admin_punch_Adminpage($message) {
-
-
-
-    return $message;
+  //$rows = array();
+ // $header = array(t('Lista de Ip address'), t('Operacion'));
+  
+  
+  $build['admin_punch_ip_ranges_form'] = drupal_get_form('admin_punch_ip_ranges_form');
+ // $build['ip_ranges_banning_table'] = array(
+    //'#theme' => 'table', //Muestra el header donde se van a ver las ip bloqueadas o no...
+    //'#header' => $header,
+   // '#rows' => $rows,
+ //);
+  return $build; 
   }
+   
+  function admin_punch_ip_ranges_form($form, $form_state) {
+      
+  $form['ip_blocked'] = array(
+    '#title' => t('Ip Adrress blocked'),
+    '#type' => 'textfield',
+    '#size' => 48,
+    '#required' => TRUE,
+    '#maxlength' => 15,
+    '#description' => t(' Enter the IP-address  Ej:(192.168.0.1).'),
+  );
+   $form['description'] = array(
+     '#title' => t('Description'),
+     '#type' => 'textfield',
+     '#size' => 100,
+     '#required' => FALSE,
+     '#maxlength' => 100,
+     '#description' => t('A field to hold the IP description.'),
+  );
+   $form['actions'] = array('#type' => 'actions');
+   $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Add'),
+  );
+
+  $form['#submit'][] = 'admin_punch_ip_ranges_form_submit';
+  
+  
+  return $form;
+}
+
+function admin_punch_ip_ranges_form_submit($form, &$form_state) {
+  
+
+     global $user;
+     $user_full = user_load($user->uid, true);
+     $only_id = $user_full->uid;
+     $punch_query = db_insert('punch_admin')
+    ->fields(array(
+        'ip_address' => trim($form_state['values']['ip_blocked']),
+        'uid' => $only_id,
+        'date' => REQUEST_TIME,
+        'description' => trim($form_state['values']['description']),
+                 ))
+    ->execute();
+    drupal_set_message(t('Ip Address blocked'));   
+}
+
+ function admin_punch_validate() {
+    $ip= ip_address();
+    $result = db_query('SELECT pid FROM tb_punch_admin WHERE ip_address = :ip', array(':ip' => $ip));
+    $IP_user = $result->fetch();
+    return $IP_user;
+    }
+
+
