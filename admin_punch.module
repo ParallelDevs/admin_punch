@@ -120,24 +120,180 @@ function admin_punch_form_alter(&$form, &$form_state, $form_id){
 
 }
 
+function admin_punch_first_form_validate($form, &$form_state){
+
+    //Obtencion del UID
+    global $user;
+    $user_full = user_load($user->uid, true);
+    $only_id = $user_full->uid;
+
+    //query para traer el entry time y el exit time del USER de las ultimas 8 horas
+    $query_last_punch = db_select('user_punch_time', 'upt')
+    ->fields('upt', array('entry_time', 'exit_time'))
+    ->condition('upt.UID', $only_id)
+    //->condition('created', REQUEST_TIME - 28800)
+    ->orderBy('entry_time', 'DESC')
+    ->range(0, 1)
+    ->execute();
+
+    $prueba = $query_last_punch->fetch();
+
+
+    switch ($prueba) {
+      case is_null($prueba):
+        # primera vez insert...
+        variable_set('punchin_flag', 'punchin_insert');
+        break;
+
+      case $prueba->entry_time != null && $prueba->exit_time == null:
+        # update ...
+        variable_set('punchin_flag', 'punchin_update');
+        break;
+
+      case $prueba->entry_time != null && $prueba->exit_time != null:
+        # nuevo insert...
+        variable_set('punchin_flag', 'punchin_insertNew');
+        break;
+
+      default:
+        echo "default del case";
+        exit;
+        break;
+    }
+
+/*
+  foreach ($query_last_punch as $record) {
+
+
+    if ($record->exit_time == NULL) {
+      //insert
+
+      variable_set('punchin_flag', 'punchin_insert');
+
+
+
+
+
+    }else {
+
+      //update
+      variable_set('punchin_flag', 'exitt');
+      break;
+    }
+  }*/
+
+
+}
+
+
 
 //funcion para qe guarde los datos una vez que se presione el boton
 function admin_punch_first_form_submit($form, &$form_state){
- 
-global $user;
-$user_full = user_load($user->uid, true);
-$only_id = $user_full->uid;
-/*$time = date('h:i:s A');
-$addre = ip_address();*/
-variable_set('ipip', ip_address());
 
-  $punch_query = db_insert('user_punch_time')
-->fields(array(
-  'uid' => $only_id,
-  'entry_time' => REQUEST_TIME,
-  'ip_address' => str_replace(".","",variable_get('ipip')),
-  ))
-->execute();
+switch (variable_get('punchin_flag')) {
+      case variable_get('punchin_flag') == 'punchin_insert':
+        # primera vez insert...
+
+
+            global $user;
+            $user_full = user_load($user->uid, true);
+            $only_id = $user_full->uid;
+      /*$time = date('h:i:s A');
+      $addre = ip_address();*/
+            variable_set('ipip', ip_address());
+
+            $punch_query = db_insert('user_punch_time')
+            ->fields(array(
+            'uid' => $only_id,
+            'entry_time' => REQUEST_TIME,
+            'ip_address' => str_replace(".","",variable_get('ipip')),
+            ))
+            ->execute();
+            drupal_set_message(t('Submitted first'));
+
+
+      break;
+
+      case variable_get('punchin_flag') == 'punchin_update':
+        # update ...
+            global $user;
+            $user_full = user_load($user->uid, true);
+            $only_id_two = $user_full->uid;
+
+            $query_PID = db_select('user_punch_time', 'upt')
+            ->fields('upt', array('pid'))
+            ->condition('upt.uid', $only_id_two)
+            //->condition('created', REQUEST_TIME - 28800)
+            ->orderBy('pid', 'DESC')
+            ->range(0, 1)
+            ->execute();
+
+            $PID_user = $query_PID->fetch();
+
+            $punch_update = db_update('user_punch_time')
+            ->fields(array('exit_time' => REQUEST_TIME))
+            ->condition('pid', $PID_user->pid, '=')
+            ->execute();
+            drupal_set_message(t('Updated'));
+
+      break;
+
+      case variable_get('punchin_flag') == 'punchin_insertNew':
+        # nuevo insert...
+
+
+            global $user;
+            $user_full = user_load($user->uid, true);
+            $only_id = $user_full->uid;
+      /*$time = date('h:i:s A');
+      $addre = ip_address();*/
+            variable_set('ipip', ip_address());
+
+            $punch_query = db_insert('user_punch_time')
+            ->fields(array(
+            'uid' => $only_id,
+            'entry_time' => REQUEST_TIME,
+            'ip_address' => str_replace(".","",variable_get('ipip')),
+            ))
+            ->execute();
+            drupal_set_message(t('Submitted new'));
+
+
+        break;
+
+      default:
+        echo "default del casexxx";
+        exit;
+        break;
+    }
+
+/*
+if (variable_get('punchin_flag') == 'punchin_insert') {
+
+
+  # code...
+  global $user;
+  $user_full = user_load($user->uid, true);
+  $only_id = $user_full->uid;
+  //$time = date('h:i:s A');
+  //$addre = ip_address();
+  variable_set('ipip', ip_address());
+
+    $punch_query = db_insert('user_punch_time')
+  ->fields(array(
+    'uid' => $only_id,
+    'entry_time' => REQUEST_TIME,
+    'ip_address' => str_replace(".","",variable_get('ipip')),
+    ))
+  ->execute();
+  drupal_set_message(t('Submitted'));
+
+
+}elseif (variable_get('punchin_flag') == 'punchin_update') {
+  echo "dne";
+  exit;
+  # code...
+}*/
 
 if (variable_get('btn_punch') == 'Punch In') {
       variable_set('btn_punch', 'Punch Out');
@@ -145,7 +301,7 @@ if (variable_get('btn_punch') == 'Punch In') {
       variable_set('btn_punch', 'Punch In');
     }
 
-  drupal_set_message(t('Submitted'));
+
 }
 
 
