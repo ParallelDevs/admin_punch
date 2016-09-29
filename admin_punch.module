@@ -38,10 +38,10 @@ function admin_punch_block_view($delta = ''){
       $block['subject'] = t('Admin Punch!!');
    //   if (user_access('access admin_punch content')) {
          if (user_access('access admin_punch content')) {
-             if(admin_punch_validate()==NULL){
+             if(_admin_punch_check_ip()==NULL){
                  $block['content'] = drupal_get_form('admin_punch_first_form');
              }else{
-                drupal_set_message(t('you can not see the module admin punch because your ip address are blocked'));     
+                drupal_set_message(t('you can not see the module admin punch because your ip address is blocked'));     
             }
       
       }
@@ -318,29 +318,53 @@ function admin_punch_menu() {
     'type' => MENU_NORMAL_ITEM,
     'weight'  => 0,
   );
+  /*$items['admin/company/punchinout/delete/%'] = array(
+    'title' => 'Delete IP range',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('_admin_punch_ip_delete', 4),
+    'access arguments' => array('access administration pages'), 
+ );*/
+  
+  
+  
+  
   return $items;
 }
 
-//Pagina donde se va a tener el formulario para ingresar las ip que se quiere bloquear
+/*
+ * Pagina donde se va a tener el formulario para ingresar las ip que se quiere bloquear
+ */
 function admin_punch_Adminpage() {
 
-  //$rows = array();
- // $header = array(t('Lista de Ip address'), t('Operacion'));
+  $rows = array();
+  $header = array(t('Blocked IP addresses'), t('Operation'));
+  
+  $ip_list = _admin_punch_blocked_ip_list();
+  foreach ($ip_list as $ip) {
+      $rows[] = array(
+      $ip->ip_address,
+      l(t('delete'), "admin/company/punchinout/delete/$ip->pid/$ip->ip_address"),
+    );
+  }
   
   
-  $build['admin_punch_ip_ranges_form'] = drupal_get_form('admin_punch_ip_ranges_form');
- // $build['ip_ranges_banning_table'] = array(
-    //'#theme' => 'table', //Muestra el header donde se van a ver las ip bloqueadas o no...
-    //'#header' => $header,
-   // '#rows' => $rows,
- //);
+  $build['_admin_punch_blocked_ip_form'] = drupal_get_form('_admin_punch_blocked_ip_form');
+  $build['ip_ranges_banning_table'] = array(
+   '#theme' => 'table', //Muestra el header donde se van a ver las ip bloqueadas o no...
+   '#header' => $header,
+   '#rows' => $rows,
+ );
   return $build; 
   }
    
-  function admin_punch_ip_ranges_form($form, $form_state) {
+  
+  /*
+   * Formulario donde el administrador va a poder digitar las direciones ip que desea bloquear
+   */
+  function _admin_punch_blocked_ip_form($form, $form_state) {
       
   $form['ip_blocked'] = array(
-    '#title' => t('Ip Adrress blocked'),
+    '#title' => t('Blocked IP address'),
     '#type' => 'textfield',
     '#size' => 48,
     '#required' => TRUE,
@@ -361,15 +385,31 @@ function admin_punch_Adminpage() {
     '#value' => t('Add'),
   );
 
-  $form['#submit'][] = 'admin_punch_ip_ranges_form_submit';
+  $form['#validate'][] = '_admin_punch_ip_form_validate';
+  $form['#submit'][] = '_admin_punch_blocked_ip_form_submit';
   
   
   return $form;
 }
 
-function admin_punch_ip_ranges_form_submit($form, &$form_state) {
-  
+/*
+ * Funcion que verifica que no se ingrese una ip invalida
+ */
+function _admin_punch_ip_form_validate($form, &$form_state){
+    
+    $ip_blocked = trim($form_state['values']['ip_blocked']);
+        if (filter_var($ip_blocked, FILTER_VALIDATE_IP, FILTER_FLAG_NO_RES_RANGE) == FALSE) {
+        form_set_error('ip_blocked', t("IP is not a valid IP address."));
+  }
+}
 
+
+
+/*
+ * Funcion para agregar ip a la lista de ip bloqueadas
+ */
+function _admin_punch_blocked_ip_form_submit($form, &$form_state) {
+  
      global $user;
      $user_full = user_load($user->uid, true);
      $only_id = $user_full->uid;
@@ -384,11 +424,33 @@ function admin_punch_ip_ranges_form_submit($form, &$form_state) {
     drupal_set_message(t('Ip Address blocked'));   
 }
 
- function admin_punch_validate() {
+/**
+ * Funcion para verificar si en tabla punch_admin existe una ip igual a la del usuario logueado
+ */
+ function _admin_punch_check_ip() {
     $ip= ip_address();
     $result = db_query('SELECT pid FROM tb_punch_admin WHERE ip_address = :ip', array(':ip' => $ip));
     $IP_user = $result->fetch();
     return $IP_user;
     }
 
-
+/**
+ * Retorna los registros de la tabla punch_admin
+ */
+function _admin_punch_blocked_ip_list() {
+   // $ip= ip_address();
+    $result = db_query('SELECT * FROM tb_punch_admin');
+    $ip_list = $result->fetchAll();
+    return $ip_list;
+    }
+     
+    /**
+     * Muestra el form donde se pregunta que si se desea eliminar esa ip de la lista bloqueada
+     */
+  function _admin_punch_ip_delete($form, &$form_state, $pid, $ip) {
+  $form['admin_punch'] = array(
+   // '#type' => 'value',
+    '#value' => $pid,
+  );
+  return confirm_form($form, t('Are you sure you want to delete ip %ip ?', array('%ip' => $ip)), 'admin/company/punchinout', t('This action cannot be undone.'), t('Delete'), t('Cancel'));
+}
