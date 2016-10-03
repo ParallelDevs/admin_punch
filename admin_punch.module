@@ -506,5 +506,94 @@ function _admin_punch_lol_ip_Edit_submit($form, $form_state) {
    drupal_goto("admin/company/punchinout");
 }
 
+//WORK
+function admin_punch_views_api() {
+  return array(
+    'api' => '3.0',
+    );
+}
 
+function admin_punch_views_default_views() {
+  $path = './' . drupal_get_path('module', 'admin_punch') . '/views/*.inc';
+  $views = array();
+  foreach (glob($path) as $views_filename) {
+    require_once($views_filename);
+  }
+  return $views;
+}
+
+
+/**
+ * Implements views_data hook
+ */
+
+function admin_punch_views_data() {
+  $data['user_punch_time'] = array(
+  'table' => array(
+    'base' => array(
+      'field' => 'pid',
+      'title' => 'User Punch Time',
+      'help' => 'This table contains data from users who punches in/out.',
+    ),
+    'group' => 'User Punch Time',
+  ),
+  'pid' => array(
+    'title' => 'Pid',
+    'help' => 'The primary identifier for admin_punch_time.',
+    'field' => array(
+      'handler' => 'views_handler_field_numeric',
+      'click sortable' => FALSE,
+    ),
+  ),
+  'uid' => array(
+    'title' => 'Uid',
+    'help' => 'User Id',
+    'field' => array(
+      'handler' => 'views_handler_field_numeric',
+      'click sortable' => FALSE,
+    ),
+  ),
+  'entry_time' => array(
+    'title' => 'Entry Time',
+    'help' => 'Entry time',
+    'field' => array(
+      'handler' => 'views_handler_field_date',
+      'click sortable' => TRUE,
+    ),
+  ),
+  'exit_time' => array(
+    'title' => 'Exit Time',
+    'help' => 'Exit time',
+    'field' => array(
+      'handler' => 'views_handler_field_date',
+      'click sortable' => FALSE,
+    ),
+  ),
+  'ip_address' => array(
+    'title' => 'Ip Address',
+    'help' => 'User ip address.',
+    'field' => array(
+      'handler' => 'views_handler_field',
+      'click sortable' => FALSE,
+    ),
+  ),
+  'latitude' => array(
+    'title' => 'Latitude',
+    'help' => 'Latitude',
+    'field' => array(
+      'handler' => 'views_handler_field',
+      'click sortable' => FALSE,
+    ),
+  ),
+  'longitude' => array(
+    'title' => 'Longitude',
+    'help' => 'Longitude',
+    'field' => array(
+      'handler' => 'views_handler_field',
+      'click sortable' => FALSE,
+    ),
+  ),
+);
+  return $data;
+}
 
