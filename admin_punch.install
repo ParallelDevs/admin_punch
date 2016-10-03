@@ -39,7 +39,7 @@ function admin_punch_schema() {
       'ip_address' => array(
             'description' => 'Ip address blocked.', 
             'type' => 'varchar',
-            'length' => 12,
+            'length' => 51,
             'null' => TRUE),  
       'uid' => array(
             'description' => 'User Id',
@@ -80,7 +80,8 @@ function admin_punch_schema() {
                 'null' => TRUE),
             'ip_address' => array(
                 'description' => 'User ip address.', 
-                'type' => 'int',
+                'type' => 'varchar',
+                'length' => 51,
                 'null' => TRUE),
             'latitude' => array(
                 'description' => 'Latitude',
