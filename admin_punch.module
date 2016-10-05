@@ -33,10 +33,11 @@ function admin_punch_block_info () {
 function admin_punch_block_view($delta = ''){
   switch ($delta) {
     case 'admin_punch':
-      $block['subject'] = t('Admin Punch!!');
+      $block['subject'] = t('Punch In/Out form');
          if (user_access('access admin_punch content')) {
-             if(_admin_punch_check_ip()==NULL){
-                  drupal_set_message(t("you can't see the module admin punch because your ip address is blocked"));
+             if(_admin_punch_check_ip() == NULL){
+                  //drupal_set_message(t("you can't see the module admin punch because your ip address is blocked"));
+                 $block['content'] = t("You are not allowed to punch in/out from your current network ip address.");
              }else{
                 $block['content'] = drupal_get_form('admin_punch_first_form');     
             }
@@ -303,7 +304,7 @@ function admin_punch_menu() {
   $items = array();
 
   $items['admin/company/punchinout'] = array(
-    'title' => 'Admin Page',
+    'title' => 'Punch In/Out Settings',
     'description' => 'Administration for admin_punch module',
     'page callback' => 'admin_punch_Adminpage',
     'access callback' => TRUE,
@@ -320,19 +321,10 @@ function admin_punch_menu() {
   $items['admin/company/punchinout/edit/%'] = array(
     'title' => 'Edit IP address',
     'page callback' => 'drupal_get_form',
-    'page arguments' => array('_admin_punch_ip_Edit', 1),
+    'page arguments' => array('_admin_punch_ip_Edit',4,5),
     'access arguments' => array('access administration pages'), 
  );
-  
-  /*$items['admin/company/punchinout/edit'] = array(
-    'title' => 'Edit IP address',
-    'page callback' => 'admin_punch_AdminpageEdit',
-    'access callback' => TRUE,
-    'access arguments' => array('access administration pages'),
-    'type' => MENU_NORMAL_ITEM,
-    'weight'  => 0,
-   *
- );*/
+
   return $items;
 }
 
@@ -366,7 +358,7 @@ function admin_punch_Adminpage() {
    */
   function _admin_punch_ip_form($form, $form_state) {
   $form['allowed_ip'] = array(
-    '#prefix' =>  t('Administrative page for allowed ip addresses '),
+    '#prefix' =>  t('<strong>Note that your current ip address is <i>'.ip_address().'</strong>'),
     '#title' => t('Allowed IP address'),
     '#type' => 'textfield',
     '#size' => 48,
@@ -413,8 +405,10 @@ function _admin_punch_allowed_ip_form_submit($form, &$form_state) {
      global $user;
      $user_full = user_load($user->uid, true);
      $only_id = $user_full->uid;
-     $punch_query = db_insert('punch_admin')
-
+     $fingered_ip = trim($form_state['values']['allowed_ip']);
+     
+     if(_verifyexistingIP($fingered_ip)==null){
+         $punch_query = db_insert('punch_admin')
     ->fields(array(
         'ip_address' => trim($form_state['values']['allowed_ip']),
         'uid' => $only_id,
@@ -422,7 +416,13 @@ function _admin_punch_allowed_ip_form_submit($form, &$form_state) {
         'description' => trim($form_state['values']['description']),
          ))
     ->execute();
-    drupal_set_message(t('Added IP address'));   
+     drupal_set_message(t('Added IP address'));   
+     }else{
+         drupal_set_message(t('Ip address already exists in the list')); 
+     }
+     
+     
+       
 
 }
 
@@ -468,8 +468,10 @@ function _admin_punch_ip_delete_submit($form, &$form_state) {
   $form_state['redirect'] = 'admin/company/punchinout';
 }
 
-
-  function _admin_punch_ip_Edit($form, $form_state, $pid, $ip) {
+/*
+ * Funcion para mostrar un formulario al usuario en donde va a poder modificar alguna direcion ip
+ */
+function _admin_punch_ip_Edit($form, $form_state, $pid, $ip) {
   $form['allowed_ip'] = array(
     '#prefix' =>  t('Administrative page for edit ip addresses'),
     '#title' => t('Allowed IP address'),
@@ -479,32 +481,47 @@ function _admin_punch_ip_delete_submit($form, &$form_state) {
     '#maxlength' => 15,
     '#description' => t(' Enter the IP-address.'),
     '#default_value'=> $ip,
+    
     );
-    /*$form['actions'] = array('#type' => 'actions');
-    $form['actions']['submit'] = array(
+  
+    $form['get_pid'] = array(
+      '#type' => 'value',
+      '#value' => $pid,
+    );
+    
+    $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Edit'),
-  );*/
-    
-    $form['actions']['submit'] = array(
-    '#type' => 'submit',
-    '#value' => t('Cancel'),
   );
-
-  $form['#validate'][] = '_admin_punch_ip_form_validate';
-  //$form['#submit'][] = '_admin_punch_allowed_ip_form_submit';
-    $form['#submit'][] = '_admin_punch_lol_ip_Edit_submit';
-   // $form['#button'][] = '_admin_punch_ip_Edit_button';
+    
+    $form['actions']['cancel'] = array(
+    '#markup' => l(t('Cancel'), 'admin/company/punchinout'),
+    '#weight' => 20,
+  );
+   
+    $form['#validate'][] = '_admin_punch_ip_form_validate';
+    $form['#submit'][] = '_admin_punch_ip_Edit_submit';
     
   return $form;
 }
 
-function _admin_punch_lol_ip_Edit_submit($form, $form_state) {
-  
-  $form_state['redirect'] = 'admin/config/people';
-  drupal_set_message(t('entro'));   
-   drupal_goto("admin/company/punchinout");
+/*
+ * Funcion para guardar en la base de datos alguna edicion de una direccion ip realizada por el administrador
+ */
+function _admin_punch_ip_Edit_submit($form, $form_state) {  
+    
+      $pid = $form_state['values']['get_pid'];
+      $punch_update = db_update('punch_admin')
+      ->fields(array('ip_address' => trim($form_state['values']['allowed_ip'])))
+      ->condition('pid', $pid, '=')
+      ->execute();
+      drupal_set_message(t('Successful uhjhjpdate'));  
+      drupal_goto("admin/company/punchinout");
 }
 
-
-
+function _verifyexistingIP($fingered_ip){
+    $ip= $fingered_ip;
+    $result = db_query('SELECT pid FROM punch_admin WHERE ip_address = :ip', array(':ip' => $ip));
+    $IP_user = $result->fetch();
+    return $IP_user;
+}
