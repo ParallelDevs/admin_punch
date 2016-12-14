@@ -1,0 +1,121 @@
+<?php
+
+$view = new view();
+$view->name = 'views_user_test';
+$view->description = 'Punch in/out Results';
+$view->tag = '';
+$view->base_table = 'user_punch_time';
+$view->human_name = 'Vista de admin punch';
+$view->core = 0;
+$view->api_version = '3.0';
+$view->disabled = FALSE; /* Edit this to true to make a default view disabled initially */
+
+/* Display: Master */
+$handler = $view->new_display('default', 'Master', 'default');
+$handler->display->display_options['use_more_always'] = FALSE;
+$handler->display->display_options['access']['type'] = 'none';
+$handler->display->display_options['cache']['type'] = 'none';
+$handler->display->display_options['query']['type'] = 'views_query';
+$handler->display->display_options['exposed_form']['type'] = 'basic';
+$handler->display->display_options['pager']['type'] = 'full';
+$handler->display->display_options['style_plugin'] = 'table';
+$handler->display->display_options['style_options']['columns'] = array(
+  'uid' => 'uid',
+  'entry_time' => 'entry_time',
+  'exit_time' => 'exit_time',
+  'ip_address' => 'ip_address',
+);
+$handler->display->display_options['style_options']['default'] = '-1';
+$handler->display->display_options['style_options']['info'] = array(
+  'uid' => array(
+    'sortable' => 1,
+    'default_sort_order' => 'asc',
+    'align' => '',
+    'separator' => '',
+    'empty_column' => 0,
+  ),
+  'entry_time' => array(
+    'sortable' => 1,
+    'default_sort_order' => 'asc',
+    'align' => '',
+    'separator' => '',
+    'empty_column' => 0,
+  ),
+  'exit_time' => array(
+    'sortable' => 1,
+    'default_sort_order' => 'asc',
+    'align' => '',
+    'separator' => '',
+    'empty_column' => 0,
+  ),
+  'ip_address' => array(
+    'align' => '',
+    'separator' => '',
+    'empty_column' => 0,
+  ),
+);
+/* Field: User Punch Time: Pid */
+$handler->display->display_options['fields']['pid']['id'] = 'pid';
+$handler->display->display_options['fields']['pid']['table'] = 'user_punch_time';
+$handler->display->display_options['fields']['pid']['field'] = 'pid';
+$handler->display->display_options['fields']['pid']['separator'] = '';
+/* Field: User Punch Time: Uid */
+$handler->display->display_options['fields']['uid']['id'] = 'uid';
+$handler->display->display_options['fields']['uid']['table'] = 'user_punch_time';
+$handler->display->display_options['fields']['uid']['field'] = 'uid';
+$handler->display->display_options['fields']['uid']['separator'] = '';
+/* Field: User Punch Time: User Name */
+$handler->display->display_options['fields']['user_name']['id'] = 'user_name';
+$handler->display->display_options['fields']['user_name']['table'] = 'user_punch_time';
+$handler->display->display_options['fields']['user_name']['field'] = 'user_name';
+/* Field: User Punch Time: Ip Address */
+$handler->display->display_options['fields']['ip_address']['id'] = 'ip_address';
+$handler->display->display_options['fields']['ip_address']['table'] = 'user_punch_time';
+$handler->display->display_options['fields']['ip_address']['field'] = 'ip_address';
+/* Field: User Punch Time: Entry Time */
+$handler->display->display_options['fields']['entry_time']['id'] = 'entry_time';
+$handler->display->display_options['fields']['entry_time']['table'] = 'user_punch_time';
+$handler->display->display_options['fields']['entry_time']['field'] = 'entry_time';
+$handler->display->display_options['fields']['entry_time']['date_format'] = 'long';
+$handler->display->display_options['fields']['entry_time']['second_date_format'] = 'long';
+$handler->display->display_options['fields']['entry_time']['timezone'] = 'America/Costa_Rica';
+/* Field: User Punch Time: Exit Time */
+$handler->display->display_options['fields']['exit_time']['id'] = 'exit_time';
+$handler->display->display_options['fields']['exit_time']['table'] = 'user_punch_time';
+$handler->display->display_options['fields']['exit_time']['field'] = 'exit_time';
+$handler->display->display_options['fields']['exit_time']['date_format'] = 'long';
+$handler->display->display_options['fields']['exit_time']['second_date_format'] = 'long';
+$handler->display->display_options['fields']['exit_time']['timezone'] = 'America/Costa_Rica';
+/* Field: User Punch Time: Entry latitude */
+$handler->display->display_options['fields']['entry_latitude']['id'] = 'entry_latitude';
+$handler->display->display_options['fields']['entry_latitude']['table'] = 'user_punch_time';
+$handler->display->display_options['fields']['entry_latitude']['field'] = 'entry_latitude';
+/* Field: User Punch Time: Entry longitude */
+$handler->display->display_options['fields']['entry_longitude']['id'] = 'entry_longitude';
+$handler->display->display_options['fields']['entry_longitude']['table'] = 'user_punch_time';
+$handler->display->display_options['fields']['entry_longitude']['field'] = 'entry_longitude';
+/* Field: User Punch Time: Exit latitude */
+$handler->display->display_options['fields']['exit_latitude']['id'] = 'exit_latitude';
+$handler->display->display_options['fields']['exit_latitude']['table'] = 'user_punch_time';
+$handler->display->display_options['fields']['exit_latitude']['field'] = 'exit_latitude';
+/* Field: User Punch Time: Exit longitude */
+$handler->display->display_options['fields']['exit_longitude']['id'] = 'exit_longitude';
+$handler->display->display_options['fields']['exit_longitude']['table'] = 'user_punch_time';
+$handler->display->display_options['fields']['exit_longitude']['field'] = 'exit_longitude';
+/* Field: User Punch Time: Worked Hours */
+$handler->display->display_options['fields']['worked_hours']['id'] = 'worked_hours';
+$handler->display->display_options['fields']['worked_hours']['table'] = 'user_punch_time';
+$handler->display->display_options['fields']['worked_hours']['field'] = 'worked_hours';
+
+/* Display: Users punch time */
+$handler = $view->new_display('page', 'Users punch time', 'page_1');
+$handler->display->display_options['display_description'] = 'View to check the user\'s data';
+$handler->display->display_options['path'] = 'admin/config/Punch-In-Out/current-users-punch';
+$handler->display->display_options['menu']['type'] = 'normal';
+$handler->display->display_options['menu']['title'] = 'Punch In/Out Results';
+$handler->display->display_options['menu']['description'] = 'Users Activities';
+$handler->display->display_options['menu']['weight'] = '1';
+$handler->display->display_options['menu']['name'] = 'management';
+$handler->display->display_options['menu']['context'] = 0;
+$handler->display->display_options['menu']['context_only_inline'] = 0;
+

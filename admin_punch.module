@@ -1,0 +1,672 @@
+<?php
+/**
+ * Implements hook_help().
+ */
+function admin_punch_help ($path, $arg) {
+  switch ($path) {
+    case "admin/help#admin_punch":
+      return '' . t("Module built to help employees to set when they came in and go out from work") . '';
+    break;
+  }
+}
+
+/*
+ * Implements hook_block_info().
+ */
+function admin_punch_block_info () {
+  $blocks['admin_punch'] = array('info' => t('Admin Punch'),'cache' => DRUPAL_NO_CACHE,);
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function admin_punch_block_view($delta = ''){
+
+  switch ($delta) {
+    case 'admin_punch':
+      $block['subject'] = t('Punch In/Out form');
+         if (user_access('access admin_punch content')) {
+             if(_admin_punch_check_ip() == NULL) {
+                $block['content'] = t("You are not allowed to punch in/out from your current network ip address.");
+            } else{
+                $block['content'] = drupal_get_form('admin_punch_first_form');
+            }
+        }
+    break;
+    }
+  return $block;
+}
+
+/**
+ * Implements hook_permission().
+ * Permiso para los usuarios que tengan acceso, visualicen el bloque
+ */
+function admin_punch_permission() {
+  return array(
+    'access admin_punch content' => array('title' => t('Access to admin_punch module'),
+    )
+  );
+}
+
+/**
+ * Implements hook_form().
+ * Formulario dentro del bloque
+ */
+function admin_punch_first_form ($form, &$form_state) {
+  $form['button_submit'] = array('#type' => 'submit','#value' => _check_value_button_punch(),);
+  return $form;
+}
+
+/**
+ * Metodo para verificar la ultima accion del USER, a partir de esto, se
+ * asigna el valor al boton para que concuerde
+ */
+function _check_value_button_punch () {
+
+  $user_info = information_user();
+
+  $query_last_punch = db_select('user_punch_time', 'upt')
+  ->fields('upt', array('entry_time', 'exit_time'))
+  ->condition('upt.UID', $user_info['only_id'])
+  ->orderBy('entry_time', 'DESC')
+  ->range(0, 1)
+  ->execute();
+
+  $last_punch_var = $query_last_punch->fetch();
+
+  switch ($last_punch_var) {
+
+    case is_null($last_punch_var):
+      variable_set('btn_punch', 'Punch In');
+    break;
+
+    case $last_punch_var->entry_time != null && $last_punch_var->exit_time == null:
+      variable_set('btn_punch', 'Punch Out');
+    break;
+
+    case $last_punch_var->entry_time != null && $last_punch_var->exit_time != null:
+      variable_set('btn_punch', 'Punch In');
+    break;
+
+    default:
+      variable_set('btn_punch', 'Punch In');
+    break;
+  }
+  return variable_get('btn_punch');
+}
+
+/**
+ * Implements hook_validate().
+ */
+function admin_punch_first_form_validate ($form, &$form_state) {
+
+  $user_info = information_user();
+
+  $query_last_punch = db_select('user_punch_time', 'upt')
+  ->fields('upt', array('entry_time', 'exit_time'))
+  ->condition('upt.UID', $user_info['only_id'])
+  ->orderBy('entry_time', 'DESC')
+  ->range(0, 1)
+  ->execute();
+
+  $last_punch_var = $query_last_punch->fetch();
+
+  switch ($last_punch_var) {
+
+    case is_null($last_punch_var):
+      variable_set('punchin_flag', 'punchin_insert');
+    break;
+
+    case $last_punch_var->entry_time != null && $last_punch_var->exit_time == null:
+      variable_set('punchin_flag', 'punchin_update');
+    break;
+
+    case $last_punch_var->entry_time != null && $last_punch_var->exit_time != null:
+      variable_set('punchin_flag', 'punchin_insertNew');
+    break;
+
+    default:
+      variable_set('punchin_flag', 'punchin_error');
+    break;
+  }
+}
+
+/**
+ * Implements hook_form_submit().
+ * Funcion para que guarde los datos una vez que se presione el boton
+ */
+function admin_punch_first_form_submit ($form, &$form_state) {
+
+  switch (variable_get('punchin_flag')) {
+
+    case variable_get('punchin_flag') == 'punchin_insert':
+
+      $user_info = information_user();
+      variable_set('ipip', ip_address());
+
+      $punch_query = db_insert('user_punch_time')
+      ->fields(array(
+      'uid' => $user_info['only_id'],
+      'entry_time' => REQUEST_TIME,
+      'ip_address' => variable_get('ipip'),
+      'user_name' => $user_info['name'],
+      'entry_latitude' => getLatitude(),
+      'entry_longitude' => getLongitude(),
+      ))
+      ->execute();
+      variable_set('btn_punch', 'Punch Out');
+      drupal_set_message(t('Punch In submitted'));
+    break;
+
+    case variable_get('punchin_flag') == 'punchin_update':
+
+      $user_info = information_user();
+
+      $query_PID = db_select('user_punch_time', 'upt')
+      ->fields('upt', array('pid'))
+      ->condition('upt.uid', $user_info['only_id'])
+      ->orderBy('pid', 'DESC')
+      ->range(0, 1)
+      ->execute();
+
+      $PID_user = $query_PID->fetch();
+      $punch_update = db_update('user_punch_time')
+      ->fields(array('exit_time' => REQUEST_TIME,'exit_latitude' => getLatitude(),'exit_longitude' => getLongitude()))
+      ->condition('pid', $PID_user->pid, '=')
+      ->execute();
+      $idForWorkedHours = $user_info['only_id'];
+      calcWorkedHours($idForWorkedHours, $PID_user);
+      variable_set('btn_punch', 'Punch In');
+      drupal_set_message(t('Punch Out submitted'));
+    break;
+
+    case variable_get('punchin_flag') == 'punchin_insertNew':
+
+      $user_info = information_user();
+      variable_set('ipip', ip_address());
+
+      $punch_query = db_insert('user_punch_time')
+      ->fields(array(
+      'uid' => $user_info['only_id'],
+      'entry_time' => REQUEST_TIME,
+      'ip_address' => variable_get('ipip'),
+      'user_name' => $user_info['name'],
+      'entry_latitude' => getLatitude(),
+      'entry_longitude' => getLongitude(),
+      ))
+      ->execute();
+      variable_set('btn_punch', 'Punch Out');
+      drupal_set_message(t('Punch In Submitted'));
+    break;
+
+    default:
+      variable_set('btn_punch', 'Punch In');
+      drupal_set_message(t('An error has ocurred, contact the Administrator'));
+    break;
+  }
+}
+
+/**
+ * Implements hook_menu().
+ */
+function admin_punch_menu() {
+
+  $items = array();
+
+  $items['admin/config/Punch-In-Out'] = array(
+    'title' => t('Punch In/Out'),
+    'page callback' => 'admin_punch_landing_page',
+    'access callback' => TRUE,
+    'access arguments' => array('access administration pages'),
+    'type' => MENU_NORMAL_ITEM,
+    'weight'  => 0,
+  );
+  $items['admin/config/Punch-In-Out/Punch-In-Out-Settings'] = array(
+    'title' => t('Punch In/Out Settings'),
+    'description' => t('Administration for admin_punch module'),
+    'page callback' => 'admin_punch_Admin_page',
+    'access callback' => TRUE,
+    'access arguments' => array('access administration pages'),
+    'type' => MENU_NORMAL_ITEM,
+    'weight'  => 1,
+  );
+  $items['admin/config/Punch-In-Out/current-users-punch'] = array(
+    'title' => t('Punch in/out Results'),
+    'description' => t('View that shows records from users'),
+    'page callback' => 'admin_punch_views_data',
+    //'access callback' => TRUE,
+    'access arguments' => array('access administration pages'),
+    'type' => MENU_NORMAL_ITEM,
+   'weight'  => 2,
+  );
+  $items['admin/config/Punch-In-Out/Punch-In-Out-Settings/delete/%'] = array(
+    'title' => t('Delete IP address'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('_admin_punch_ip_delete', 5),
+    'access arguments' => array('access administration pages'),
+ );
+  $items['admin/config/Punch-In-Out/Punch-In-Out-Settings/edit/%'] = array(
+    'title' => t('Edit IP address'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('_admin_punch_ip_Edit',5,6,7),
+    'access arguments' => array('access administration pages'),
+ );
+
+  return $items;
+}
+
+/**
+ * Pagina donde se va a tener el formulario para ingresar las direcciones ip permitidas para el sistema, ademas se mostrara´ una lista con las direcciones ip permitidas
+ */
+function admin_punch_Admin_page() {
+
+  $rows = array();
+  $header = array(t('Allowed IP addresses'),t('Description'), t('Edit IP'),t('Delete IP'));
+  $ip_list = _admin_punch_allowed_ip_list();
+  foreach ($ip_list as $ip_details) {
+      $rows[] = array(
+      $ip_details->ip_address,
+      $ip_details->description,
+      l(t('Edit'), "admin/config/Punch-In-Out/Punch-In-Out-Settings/edit/$ip_details->pid/$ip_details->ip_address/$ip_details->description"),
+      l(t('Delete'), "admin/config/Punch-In-Out/Punch-In-Out-Settings/delete/$ip_details->pid/$ip_details->ip_address"),
+    );
+  }
+  $build['_admin_punch_ip_form'] = drupal_get_form('_admin_punch_ip_form');
+  $build['ip_allowed_table'] = array('#theme' => 'table','#header' => $header,'#rows' => $rows,);
+  return $build;
+}
+
+function admin_punch_landing_page(){
+    $items = array(
+        array('title'=> t('Punch In/Out Settings'), 'path' => 'admin/config/Punch-In-Out/Punch-In-Out-Settings', 'description' => t('Administrative page')),
+        array('title'=> t('Punch In/Out Results'), 'path' => 'admin/config/Punch-In-Out/current-users-punch', 'description' => t('User activities')),
+    );
+    $output = '<ul class="admin-list compact">';
+    foreach ($items as $k => $item) {
+      $output .= '<li class="leaf">';
+      $output .= l($item['title'], $item['path']);
+      if (isset($item['description'])) {
+        $output .= '<div class="description">' . filter_xss_admin($item['description']) . '</div>';
+      }
+      $output .= '</li>';
+    }
+    $output .= '</ul>';
+    return $output ;
+}
+
+  /**
+   * Formulario donde el administrador va a poder digitar las direciones ip permitidas
+   */
+function _admin_punch_ip_form($form, $form_state) {
+
+    $form['allowed_ip'] = array(
+      '#prefix' =>  t('<strong>Note that your current ip address is <i>'.ip_address().'</strong>'),
+      '#title' => t('Allowed IP address'),
+      '#type' => 'textfield',
+      '#size' => 48,
+      '#required' => TRUE,
+      '#maxlength' => 15,
+      '#description' => t('Enter the IP-address.'),
+    );
+    $form['description'] = array(
+      '#title' => t('Description'),
+      '#type' => 'textfield',
+      '#size' => 100,
+      '#required' => TRUE,
+      '#maxlength' => 100,
+      '#description' => t('Add a description'),
+    );
+    $form['actions'] = array('#type' => 'actions');
+    $form['actions']['submit'] = array(
+      '#type' => 'submit',
+      '#value' => t('Add'),
+    );
+    $form['#validate'][] = '_admin_punch_ip_form_validate';
+    $form['#submit'][] = '_admin_punch_allowed_ip_form_submit';
+
+    return $form;
+}
+
+/**
+ * Función para controlar que no se introduzcan direcciones ip invalidas
+ */
+function _admin_punch_ip_form_validate($form, &$form_state) {
+    $allowed_ip = trim($form_state['values']['allowed_ip']);
+    if ((filter_var($allowed_ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) == FALSE) && (filter_var($allowed_ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) == FALSE)){
+        form_set_error('allowed_ip', t("IP is not a valid IP address."));
+    }
+}
+
+/*
+ * Función para que a la hora que se de clic en el boton add, se agregue lo que tiene el formulario a la base de datos
+ */
+function _admin_punch_allowed_ip_form_submit($form, &$form_state) {
+
+   // global $user;
+   // $user_full = user_load($user->uid, true);
+   // $only_id = $user_full->uid;
+    $user_info = information_user();
+    $ip = trim($form_state['values']['allowed_ip']);
+
+    if(_checkexistingIP($ip) == null) {
+        $punch_query = db_insert('punch_admin')
+        ->fields(array(
+        'ip_address' => trim($form_state['values']['allowed_ip']),
+        'uid' => $user_info['only_id'],
+        'date' => REQUEST_TIME,
+        'description' => trim($form_state['values']['description']),
+        ))
+        ->execute();
+        drupal_set_message(t('Added IP address'));
+    }else{
+        drupal_set_message(t('Ip address already exists in the list'));
+    }
+}
+
+/**
+ * Funcion para verificar si en tabla punch_admin existe una ip igual a la del usuario logueado actualmente
+ */
+function _admin_punch_check_ip() {
+    $ip= ip_address();
+    $result = db_query('SELECT pid FROM punch_admin WHERE ip_address = :ip', array(':ip' => $ip));
+    $pid_user = $result->fetch();
+    return $pid_user;
+}
+
+/**
+ * Retorna los registros de la tabla punch_admin
+ */
+function _admin_punch_allowed_ip_list() {
+    $result = db_query('SELECT * FROM punch_admin');
+    $ip_list = $result->fetchAll();
+    return $ip_list;
+}
+
+/**
+ * Muestra el form donde se pregunta que si se desea eliminar esa ip de la lista de direcciones permitida
+ */
+function _admin_punch_ip_delete($form, &$form_state, $pid, $ip) {
+  $form['admin_punch'] = array(
+    '#type' => 'value',
+    '#value' => $pid,
+  );
+  return confirm_form($form, t('Are you sure you want to delete ip %ip ?', array('%ip' => $ip)), 'admin/config/Punch-In-Out/Punch-In-Out-Settings', t('This action cannot be undone.'), t('Delete'), t('Cancel'));
+}
+
+/*
+ * Funcion para eliminar un registro de la base de datos, en este caso las ip que se deseen quitar de la lista de direcciones permitidas.
+*/
+function _admin_punch_ip_delete_submit($form, &$form_state) {
+
+    $pid = $form_state['values']['admin_punch'];
+    db_delete('punch_admin')
+    ->condition('pid', $pid)
+    ->execute();
+    $form_state['redirect'] = 'admin/config/Punch-In-Out/Punch-In-Out-Settings';
+}
+
+/*
+ * Funcion para mostrar un formulario al usuario en donde va a poder modificar alguna direcion ip
+ */
+function _admin_punch_ip_Edit($form, $form_state, $pid, $ip,$description) {
+
+    $form['allowed_ip'] = array(
+      '#prefix' =>  t('Administrative page for edit ip addresses'),
+      '#title' => t('Allowed IP address'),
+      '#type' => 'textfield',
+      '#size' => 48,
+      '#required' => TRUE,
+      '#maxlength' => 15,
+      '#description' => t(' Enter the IP-address.'),
+      '#default_value'=> $ip,
+    );
+    $form['description_ip'] = array(
+      '#title' => t('Description IP'),
+      '#type' => 'textfield',
+      '#size' => 100,
+      '#required' => TRUE,
+      '#maxlength' => 100,
+      '#description' => t('Enter the description of the ip address.'),
+      '#default_value'=> $description,
+    );
+    $form['get_pid'] = array(
+      '#type' => 'value',
+      '#value' => $pid,
+    );
+    $form['submit'] = array(
+      '#type' => 'submit',
+      '#value' => t('Edit'),
+    );
+    $form['actions']['cancel'] = array(
+      '#markup' => l(t('Cancel'), 'admin/config/Punch-In-Out/Punch-In-Out-Settings'),
+      '#weight' => 20,
+    );
+
+    $form['#validate'][] = '_admin_punch_ip_form_validate';
+    $form['#submit'][] = '_admin_punch_ip_Edit_submit';
+
+  return $form;
+}
+
+function _admin_punch_ip_Edit_submit($form, $form_state) {
+
+    $pid = $form_state['values']['get_pid'];
+    $ip = trim($form_state['values']['allowed_ip']);
+    $description = trim($form_state['values']['description_ip']);
+    sesid('dPlM-t7CNbxe1tpKG2SAQWbn7YEhmxNUapv3lwxJD7s');
+    exit;
+
+ 
+    if(checkIpNochanged($ip, $pid) == null){
+        if(_checkexistingIP($ip) == null) {
+            $punch_update = db_update('punch_admin')
+            ->fields(array('ip_address' => $ip,'description' => $description))
+            ->condition('pid', $pid, '=')
+            ->execute();
+            drupal_set_message(t('Successful update'));
+            drupal_goto("admin/config/Punch-In-Out/Punch-In-Out-Settings");
+        }else{
+            drupal_set_message(t('Ip address already exists in the list'));
+        }
+    }else{
+        $punch_update = db_update('punch_admin')
+        ->fields(array('ip_address' => $ip,'description' => $description))
+        ->condition('pid', $pid, '=')
+        ->execute();
+        drupal_set_message(t('Successful update'));
+        drupal_goto("admin/config/Punch-In-Out/Punch-In-Out-Settings");
+    }
+}
+
+/*
+ *  Función para verificar si la ip digitada existe
+ */
+function _checkexistingIP($ip_address) {
+    $ip = $ip_address;
+    $result = db_query('SELECT pid FROM punch_admin WHERE ip_address = :ip', array(':ip' => $ip));
+    $pid_user = $result->fetch();
+    return $pid_user;
+}
+
+/*
+ * Funcion que verifica si el usuario no realiza ningun cambio de ip a la hora que le da editar ip.
+ */
+function checkIpNochanged($ip_address, $pid_param){
+     $ip = $ip_address;
+    
+     $pid = $pid_param;
+     $result = db_query('SELECT pid FROM punch_admin WHERE ip_address = :ip and pid = :pid', array(':ip' => $ip, ':pid' => $pid));
+     $pid_user = $result->fetch();
+     return $pid_user;
+}
+
+function getLongitude(){
+    $user_ip = ip_address();
+    $geo = unserialize(file_get_contents("http://www.geoplugin.net/php.gp?ip=$user_ip"));
+    $longitude = $geo["geoplugin_longitude"];
+     return $longitude;
+    }
+
+function getLatitude(){
+    $user_ip = ip_address();
+    $geo = unserialize(file_get_contents("http://www.geoplugin.net/php.gp?ip=$user_ip"));
+    $latitude = $geo["geoplugin_latitude"];
+    return $latitude;
+    }
+
+function admin_punch_views_api() {
+  return array(
+    'api' => '3.0',
+    );
+}
+
+function admin_punch_views_data() {
+  $data['user_punch_time'] = array(
+  'table' => array(
+    'base' => array(
+      'field' => 'pid',
+      'title' => 'User Punch Time',
+      'help' => 'This table contains data from users who punches in/out.',
+    ),
+    'group' => 'User Punch Time',
+  ),
+  'pid' => array(
+    'title' => 'Pid',
+    'help' => 'The primary identifier for admin_punch_time.',
+    'field' => array(
+      'handler' => 'views_handler_field_numeric',
+      'click sortable' => FALSE,
+    ),
+  ),
+  'uid' => array(
+    'title' => 'Uid',
+    'help' => 'User Id',
+    'field' => array(
+      'handler' => 'views_handler_field_numeric',
+      'click sortable' => FALSE,
+    ),
+  ),
+  'entry_time' => array(
+    'title' => 'Entry Time',
+    'help' => 'Entry time',
+    'field' => array(
+      'handler' => 'views_handler_field_date',
+      'click sortable' => TRUE,
+    ),
+  ),
+  'exit_time' => array(
+    'title' => 'Exit Time',
+    'help' => 'Exit time',
+    'field' => array(
+      'handler' => 'views_handler_field_date',
+      'click sortable' => FALSE,
+    ),
+  ),
+  'ip_address' => array(
+    'title' => 'Ip Address',
+    'help' => 'User ip address.',
+    'field' => array(
+      'handler' => 'views_handler_field',
+      'click sortable' => FALSE,
+    ),
+  ),
+ 'entry_latitude' => array(
+    'title' => 'Entry latitude',
+    'help' => 'Entry latitude',
+    'field' => array(
+      'handler' => 'views_handler_field',
+      'click sortable' => FALSE,
+    ),
+  ),
+  'entry_longitude' => array(
+    'title' => 'Entry longitude',
+    'help' => 'Entry longitude',
+    'field' => array(
+      'handler' => 'views_handler_field',
+      'click sortable' => FALSE,
+    ),
+  ),
+  'exit_latitude' => array(
+    'title' => 'Exit latitude',
+    'help' => 'Exit latitude',
+    'field' => array(
+      'handler' => 'views_handler_field',
+      'click sortable' => FALSE,
+    ),
+  ),
+  'exit_longitude' => array(
+    'title' => 'Exit longitude',
+    'help' => 'Exit longitude',
+    'field' => array(
+      'handler' => 'views_handler_field',
+      'click sortable' => FALSE,
+    ),
+  ),
+  'user_name' => array(
+    'title' => 'User Name',
+    'help' => 'Name of user',
+    'field' => array(
+      'handler' => 'views_handler_field',
+      'click sortable' => FALSE,
+    ),
+  ),
+  'worked_hours' => array(
+   'title' => 'Worked Hours',
+   'help' => 'Summary of hours done by the user',
+   'field' => array(
+     'handler' => 'views_handler_field',
+     'click sortable' => TRUE,
+   ),
+ ),
+);
+  return $data;
+}
+
+
+function admin_punch_views_data_alter(&$data) {
+  $data['user_punch_time']['alias_punch'] = array(
+    'title' => t('user punch relationship'),
+    'help' => t('Add a relationship between user punch and users tables'),
+    'relationship' => array(
+      'base' => 'users',
+      'base field' => 'uid',
+      'field' => 'uid',
+      'handler' => 'views_handler_relationship',
+      'label' => t('user punch relationship'),
+      'title' => t('user punch relationship'),
+      'help' => t('Add a relationship between user punch and users tables'),
+    ),
+  );
+}
+
+function  information_user(){
+    global $user;
+    $user_full = user_load($user->uid, true);
+    $items = array('name'=>$user_full->name,'only_id'=>$user_full->uid);
+    return  $items;
+}
+
+function query_last_punch2($only_id_three){
+ $query_last_punch = db_select('user_punch_time', 'upt')
+ ->fields('upt', array('entry_time', 'exit_time'))
+ ->condition('upt.UID', $only_id_three)
+ ->orderBy('entry_time', 'DESC')
+ ->range(0, 1)
+ ->execute();
+
+ $last_punch_var = $query_last_punch->fetch();
+ return $last_punch_var;
+}
+
+function calcWorkedHours($idForWorkedHours, $PID_user){
+ $last_punch_var = query_last_punch2($idForWorkedHours);
+ $entryWork = $last_punch_var->entry_time;
+ $exitWork = $last_punch_var->exit_time;
+ $totalInSecs = ($exitWork-$entryWork);//<------------ hasta aqui ok
+ $worked_hours = floor($totalInSecs/3600).gmdate(":i:s", $totalInSecs%3600);
+ $punch_update_worked_hours = db_update('user_punch_time')
+     ->fields(array('worked_hours' => $worked_hours))
+     ->condition('pid', $PID_user->pid, '=')
+     ->execute();
+}

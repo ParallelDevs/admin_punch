@@ -1,0 +1,490 @@
+<?php
+/**
+ * Implements hook_menu().
+ */
+
+function admin_punch_API_menu() {
+
+  $items = array();
+  $items['api/adminpunch/GP'] = array(
+    'page callback' => 'punchAdminAPI',
+    'access callback' => TRUE,
+    'delivery callback' => 'drupal_json_output',
+    'type' => MENU_CALLBACK
+  );
+  $items['api/adminpunch/GPD/%'] = array(
+    'page callback' => 'punchAdminAPI',
+    'access callback' => TRUE,
+    'delivery callback' => 'drupal_json_output',
+    'page arguments' => array(3),
+    'type' => MENU_CALLBACK
+  );
+    $items['api/userpunch'] = array(
+   'page callback' => 'punchUserAPI2',
+   'access callback' => TRUE,
+   'delivery callback' => 'drupal_json_output',
+   'type' => MENU_CALLBACK
+ );
+
+  return $items;
+}
+
+
+function _auth_by_sessid(){
+
+  $cleanTok = _security_check();
+
+  $sess_query = db_select('sessions', 'sess')
+  ->fields('sess', array('uid'))
+  ->condition('sess.sid', $cleanTok)
+  ->execute();
+
+  $ses_id = $sess_query->fetch()->uid;
+  $user_full = user_load($ses_id, true);
+  $items = array('name'=>$user_full->name,'only_id'=>$user_full->uid);
+
+  return $items;
+}
+
+function _security_check() {
+  $tok = $_SERVER['HTTP_AUTHORIZATION'];
+  $trailLen = strlen($tok);
+  $arr1 = str_split($tok);
+  $basic = null;
+  $trail = null;
+
+  for ($i = 0; $i < 6; $i++) {
+  $basic .= $arr1[$i];}
+  for ($i = $trailLen-6; $i <= $trailLen; $i++) {
+  $trail .= $arr1[$i];}
+/***********************************************/
+  if ($basic==="Basic "&&$trail==="|123xz") {
+    $tok2 = str_replace($basic, "", $tok);
+    $tok3 = str_replace($trail, "", $tok2);
+    return $tok3;
+  } else {
+    return null;
+  }
+}
+
+function punchUserAPI2(){
+
+  $fullQuery = _auth_by_sessid();
+  $idQuery = $fullQuery['only_id'];
+
+//    $data = file_get_contents('php://input');
+//    $data = json_decode($data);
+    if (is_null($idQuery)) {
+      return http_response_code(404);
+    } else {
+  switch ($_SERVER['REQUEST_METHOD']) {
+      case 'GET':
+          return getLastPunch($idQuery);
+        break;
+      case 'POST':
+        return insertLastPunch($idQuery);
+        break;
+      case 'PUT':
+        return updatePunch($idQuery);
+        break;
+      default:
+        return http_response_code(404);
+  }
+    }
+
+}
+
+function punchAdminAPI($id){
+
+    $data = file_get_contents('php://input');
+    $data = json_decode($data);
+
+    switch ($_SERVER['REQUEST_METHOD']) {
+        case 'GET':
+           if($id == null){
+             return list_allowed_ip_addresses();
+           }else{
+             return specify_allowed_ip_address($id);
+              // return _drupal_session_read2($id) ;
+             // return sesid('dPlM-t7CNbxe1tpKG2SAQWbn7YEhmxNUapv3lwxJD7s')
+           }                   
+            break;
+
+        case 'POST':
+            return insert_allowed_ip_address($data);
+            break;
+
+        case 'PUT':
+            return edit_allowed_ip_address($data);
+            break;
+
+        case 'DELETE':
+            return delete_allowed_ip_address($id);
+            break;
+
+        default:
+            http_response_code(404);
+    }
+}
+
+
+function prueba(){
+
+    $data = file_get_contents('php://input');
+    $data = json_decode($data);
+    
+   // print_r($_REQUEST);
+    
+     //exit;
+    switch ($_SERVER['REQUEST_METHOD']) {
+        case 'GET':  
+           if($id == null){
+             return list_allowed_ip_addresses();  
+           }else{
+             return specify_allowed_ip_address($id);
+              // return _drupal_session_read2($id) ;
+             // return sesid('dPlM-t7CNbxe1tpKG2SAQWbn7YEhmxNUapv3lwxJD7s')
+           }        
+            break;
+            
+        case 'POST':
+            //return insert_allowed_ip_address($data);
+           return  sesid($data);
+            break;
+        
+        case 'PUT':
+            return edit_allowed_ip_address($data);
+            break;
+        
+        case 'DELETE':       
+            return delete_allowed_ip_address($id);
+            break;
+        
+        default:
+            http_response_code(404);
+    }   
+}
+
+function  list_allowed_ip_addresses(){
+    $result = db_query('SELECT * FROM punch_admin');
+    $list = $result->fetchAll();
+    return $list;
+}
+
+function specify_allowed_ip_address($var){
+
+    if(_checkPID($var) == null){
+        return resourceNotFound();
+    }else{
+        $pid = $var;
+        $result = db_query('SELECT * FROM punch_admin WHERE pid = :pid', array(':pid' => $pid));
+        $pid_user = $result->fetchAll();
+        return $pid_user;
+    }
+}
+
+function  insert_allowed_ip_address($details_ip_address){
+
+    $ip =  $details_ip_address-> ip_address;
+    $description = $details_ip_address-> description;
+
+    if($ip == null || $description == null ){
+        return incorrect_data();
+    }else{
+        if(ip_validate($ip) == TRUE){
+            return conflict();
+        }else{
+            if(_checkexistingIP($ip) == NULL){
+                $punch_query = db_insert('punch_admin')
+                ->fields(array(
+               'ip_address' => $ip,
+               'uid' => '2',
+               'date' => REQUEST_TIME,
+               'description' => $description,
+               ))
+                 ->execute();
+                return created();
+            }else{
+               return exist();
+            }
+        }
+    }
+}
+
+function edit_allowed_ip_address($details_ip_address){
+
+    $pid = $details_ip_address->pid;
+    $ip = $details_ip_address->ip_address;
+
+    if(_checkPID($pid)==NULL){
+        return resourceNotFound();
+    }else{
+        if($ip ==null || $pid == null ){
+            return incorrect_data();
+        }else{
+            if(ip_validate($ip) == TRUE){
+                return conflict();
+            }else{
+                if(_checkexistingIP($ip) == NULL){
+                    $punch_update = db_update('punch_admin')
+                    ->fields(array('ip_address' => $ip))
+                    ->condition('pid', $pid, '=')
+                    ->execute();
+                    return update_data();
+                }else{
+                    return exist();
+                }
+            }
+        }
+    }
+}
+
+function delete_allowed_ip_address($pid){
+
+   if(_checkPID($pid)==NULL){
+        return resourceNotFound();
+   }else{
+        db_delete('punch_admin')
+        ->condition('pid', $pid)
+        ->execute();
+        return  resetContent();
+    }
+}
+
+function _checkPID($var) {
+    $pid = $var;
+    $result = db_query('SELECT pid FROM punch_admin WHERE pid = :pid', array(':pid' => $pid));
+    $pid_user = $result->fetch();
+    return $pid_user;
+}
+
+function ip_validate($ip) {
+
+    $allowed_ip = $ip;
+    if ((filter_var($allowed_ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) == FALSE) && (filter_var($allowed_ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) == FALSE)){
+        return TRUE;
+    }
+    return false;
+}
+
+function resourceNotFound(){
+      return array(
+           'title' => t('RESOURCE NOT FOUND'),
+           'type' =>'http://httpstatus.es/404',
+           'detail' => t('The pid not exist.')
+       );
+    }
+
+function resetContent(){
+      return array(
+           'title' => t('RESET CONTENT'),
+           'type' =>'https://httpstatuses.com/205',
+           'detail' => t('The server has fulfilled the request.')
+       );
+    }
+
+function conflict(){
+      return array(
+           'title' => t('CONFLICT'),
+           'type' =>'https://httpstatuses.com/409',
+           'detail' => t('The request could not be completed due to a conflict with the current state of the target resource.')
+       );
+    }
+
+function exist(){
+      return array(
+           'title' => t('EXIST'),
+           'type' => 'https://httpstatuses.com/400',
+           'detail' => t('The server cannot or will not process the request due to something that is perceived to be a client error.')
+       );
+    }
+
+function created(){
+      return array(
+           'title' => t('CREATED'),
+           'type' => 'https://httpstatuses.com/201',
+           'detail' => t('The request has been fulfilled and has resulted in one or more new resources being created.')
+       );
+    }
+
+function incorrect_data(){
+      return array(
+           'title' => t('NOT ACCEPTABLE'),
+           'type' => 'https://httpstatuses.com/406',
+           'detail' => t('The target resource does not have a current representation that would be acceptable to the user agent, according to the proactive negotiation header fields received in the request.')
+       );
+    }
+
+function update_data(){
+      return array(
+           'title' => t('UPDATE'),
+           'type' => 'https://httpstatuses.com/200',
+           'detail' => t('The request has succeeded.')
+       );
+  }
+
+function created_punch(){
+      return array(
+           'title' => t('CREATED'),
+           'type' => 'https://httpstatuses.com/200',
+           'detail' => t('The request has succeeded.'),
+           'punch' => 0,
+       );
+  }
+
+ function update_data_punch(){
+      return array(
+           'title' => t('UPDATE'),
+           'type' => 'https://httpstatuses.com/200',
+           'detail' => t('The request has succeeded.'),
+           'punch' => 1,
+       );
+  }
+
+function getLastPunch($idQuery) {
+  $last_punch_var = query_last_punch($idQuery);
+  if (check_user_existence($idQuery) == NULL) {
+    return noExistence();
+  } else {
+    switch ($last_punch_var) {
+    case is_null($last_punch_var):
+      variable_set('btn_punch', 'Punch In');
+    break;
+    case $last_punch_var->entry_time != null && $last_punch_var->exit_time == null:
+      variable_set('btn_punch', 'Punch Out');
+    break;
+    case $last_punch_var->entry_time != null && $last_punch_var->exit_time != null:
+      variable_set('btn_punch', 'Punch In');
+    break;
+    default:
+      variable_set('btn_punch', 'Punch In');
+    break;
+  }
+  return variable_get('btn_punch');
+  }
+}
+
+function insertLastPunch($idQuery) {
+  $last_punch_var = query_last_punch($idQuery);
+  if (!is_numeric($idQuery)||check_user_existence($idQuery) == null) {
+    return resourceNotFound();
+  } else {
+  switch ($last_punch_var) {
+    case is_null($last_punch_var):
+      variable_set('punchin_flag', 'punchin_insert');
+    break;
+    case $last_punch_var->entry_time != null && $last_punch_var->exit_time != null:
+      variable_set('punchin_flag', 'punchin_insertNew');
+    break;
+    default:
+      variable_set('punchin_flag', 'punchin_error');
+    break;
+  }
+  return checkSubmitPunch($idQuery);
+  }
+}
+
+function checkSubmitPunch($idQuery) {
+    switch (variable_get('punchin_flag')) {
+    case variable_get('punchin_flag') == 'punchin_insert':
+    submitPunch($idQuery);
+    return created_punch();
+    break;
+    case variable_get('punchin_flag') == 'punchin_insertNew':
+    submitPunch($idQuery);
+    return created_punch();
+    break;
+    default:
+    variable_set('btn_punch', 'Punch Out');
+    return incorrect_data();
+    break;
+  }
+}
+
+function submitPunch($idQuery) {
+  $name = user_load($idQuery)->name;
+      $user_full = array(
+        'uid' => $idQuery,
+        'name' => $name,
+        );
+      punch_query2($user_full);
+  variable_set('btn_punch', 'Punch Out');
+}
+
+function updatePunch($idQuery) {
+  $last_punch_var = query_last_punch($idQuery);
+  if ($last_punch_var->entry_time == null && $last_punch_var->exit_time == null) {
+    return incorrect_data();
+  } elseif ($last_punch_var->entry_time != null && $last_punch_var->exit_time != null) {
+    return incorrect_data();
+  } else {
+    updating_punch(query_for_update($idQuery));
+    calcWorkedHoursAPI($idQuery, $last_punch_var->pid);
+    variable_set('btn_punch', 'Punch In');
+    return update_data_punch();
+  }
+
+}
+
+function check_user_existence($idQuery) {
+  $existence = db_select('users', 'usr')
+  ->fields('usr', array('name'))
+  ->condition('usr.UID', $idQuery)
+  ->execute();
+  return $existence->fetch();
+}
+
+function query_last_punch($only_id_three){
+  $query_last_punch = db_select('user_punch_time', 'upt')
+  ->fields('upt', array('entry_time', 'exit_time', 'pid'))
+  ->condition('upt.UID', $only_id_three)
+  ->orderBy('entry_time', 'DESC')
+  ->range(0, 1)
+  ->execute();
+  $last_punch_var = $query_last_punch->fetch();
+  return $last_punch_var;
+}
+
+function punch_query2($user_full){
+  $punch_query = db_insert('user_punch_time')
+      ->fields(array(
+      'uid' => $user_full['uid'],
+      'entry_time' => REQUEST_TIME,
+      'ip_address' => ip_address(),
+      'user_name' => $user_full['name'],
+      'entry_latitude' => getLatitude(),
+      'entry_longitude' => getLongitude(),
+      ))
+      ->execute();
+}
+
+function updating_punch($PID_user){
+  $punch_update = db_update('user_punch_time')
+      ->fields(array('exit_time' => REQUEST_TIME,'exit_latitude' => getLatitude(),'exit_longitude' => getLongitude()))
+      ->condition('pid', $PID_user->pid, '=')
+      ->execute();
+}
+
+function query_for_update($only_id_two){
+ $query_PID = db_select('user_punch_time', 'upt')
+     ->fields('upt', array('pid'))
+     ->condition('upt.uid', $only_id_two)
+     ->orderBy('pid', 'DESC')
+     ->range(0, 1)
+     ->execute();
+     $PID_user = $query_PID->fetch();
+     return $PID_user;
+}
+
+function calcWorkedHoursAPI($idForWorkedHours, $PID_user){
+ $last_punch_var = query_last_punch2($idForWorkedHours);
+ $entryWork = $last_punch_var->entry_time;
+ $exitWork = $last_punch_var->exit_time;
+ $totalInSecs = ($exitWork-$entryWork);//<------------ hasta aqui ok
+ $worked_hours = floor($totalInSecs/3600).gmdate(":i:s", $totalInSecs%3600);
+ $punch_update_worked_hours = db_update('user_punch_time')
+     ->fields(array('worked_hours' => $worked_hours))
+     ->condition('pid', $PID_user, '=')
+     ->execute();
+}
+
